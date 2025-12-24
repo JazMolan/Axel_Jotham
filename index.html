@@ -135,7 +135,7 @@
                         <i data-lucide="bot" class="w-6 h-6"></i>
                     </div>
                     <div class="p-5 rounded-2xl rounded-tl-none message-bubble-bot text-slate-200">
-                        <p class="text-sm md:text-base leading-relaxed">Hi! I'm <b>Bikom Axel</b>, your personal AI tutor. Let's start exploring a new topic. What's on your mind?</p>
+                        <p class="text-sm md:text-base leading-relaxed">Hi! I'm <b>Bikom Axel</b>, your upgraded AI tutor. I can now remember our whole conversation. What shall we learn today?</p>
                     </div>
                 </div>
             </div>
@@ -161,20 +161,24 @@
                     </button>
                 </div>
                 <p class="text-[10px] text-center text-slate-600 mt-4 font-medium tracking-wide">
-                    BIKOM AXEL INTELLECTUAL INTERFACE • V1.0
+                    BIKOM AXEL INTELLECTUAL INTERFACE • CORE V2.0 (STRENGTHENED)
                 </p>
             </div>
         </div>
     </main>
 
     <script>
-        const API_KEY = "AIzaSyBjOZiQ7AahWDLTczYJiaJYHnlckI3jSok"; 
-        const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent";
+        // STEP 1: GO TO https://aistudio.google.com/app/apikey
+        // STEP 2: PASTE YOUR KEY BELOW
+        const API_KEY = ""; 
+        
+        // Using Gemini 1.5 Flash (highly capable and fast)
+        const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
         const MODES = {
-            SOCRATIC: "Your name is Bikom Axel. You are a Socratic tutor. Never give the answer directly. Instead, ask helpful leading questions to guide the student to discover the answer themselves. Be encouraging and patient.",
-            EXAM_PREP: "Your name is Bikom Axel. You are an exam coach. Help the student prepare by creating practice questions based on their topic. Grade their answers and explain core concepts they might be missing.",
-            SUMMARIZER: "Your name is Bikom Axel. You are a master of simplification. Take complex academic topics and explain them as if the student is 10 years old, using analogies and clear structure."
+            SOCRATIC: "Your name is Bikom Axel. You are a world-class Socratic tutor. Your goal is to help the student reach the answer through logic. NEVER give answers directly. Instead, break down complex thoughts into tiny, manageable questions. If a student is stuck, give a hint using an analogy. Be warm, professional, and intellectually stimulating.",
+            EXAM_PREP: "Your name is Bikom Axel. You are an expert exam strategist. Help the student identify weak points in their knowledge, provide mock questions, and give feedback on their reasoning. Use pedagogical techniques like spaced repetition concepts.",
+            SUMMARIZER: "Your name is Bikom Axel. You synthesize complex information into clear, hierarchical summaries. Use bullet points, bold text for key terms, and explain jargon simply."
         };
 
         const chatBox = document.getElementById('chat-box');
@@ -183,11 +187,13 @@
         const typingIndicator = document.getElementById('typing-indicator');
 
         let currentMode = "SOCRATIC";
+        let chatHistory = []; // V2.0 Strength: Conversation Memory
 
         lucide.createIcons();
 
         function changeMode(modeKey) {
             currentMode = modeKey;
+            chatHistory = []; // Reset history when mode changes for clarity
             
             document.querySelectorAll('.mode-btn').forEach(btn => {
                 btn.classList.remove('bg-indigo-600/20', 'text-indigo-400', 'border-indigo-500/30', 'border', 'font-semibold');
@@ -200,7 +206,7 @@
                 activeBtn.classList.remove('text-slate-400', 'font-medium');
             }
 
-            appendMessage('bot', `Mode updated. I am now acting as your <b>${modeKey.replace('_', ' ').toLowerCase()}</b>. How shall we begin?`);
+            appendMessage('bot', `System recalibrated. I am now in **${modeKey.replace('_', ' ')}** mode. My memory has been cleared for this session. What's our first objective?`);
         }
 
         function appendMessage(role, text) {
@@ -225,27 +231,56 @@
             chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
         }
 
-        async function fetchAIResponse(prompt, retries = 0) {
+        async function fetchAIResponse(userText, retries = 0) {
+            if (!API_KEY || API_KEY.trim() === "") {
+                return "⚠️ **Connection Required**: Bikom Axel needs an API key in the source code (line 133).";
+            }
+
+            // Build history-aware payload
+            const contents = [
+                ...chatHistory,
+                { role: "user", parts: [{ text: userText }] }
+            ];
+
             try {
                 const response = await fetch(`${API_URL}?key=${API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        systemInstruction: { parts: [{ text: MODES[currentMode] }] }
+                        contents: contents,
+                        systemInstruction: { parts: [{ text: MODES[currentMode] }] },
+                        generationConfig: {
+                            temperature: 0.7,
+                            topK: 40,
+                            topP: 0.95,
+                            maxOutputTokens: 1024,
+                        }
                     })
                 });
 
                 if (response.status === 429 && retries < 5) {
                     const delay = Math.pow(2, retries) * 1000;
                     await new Promise(r => setTimeout(r, delay));
-                    return fetchAIResponse(prompt, retries + 1);
+                    return fetchAIResponse(userText, retries + 1);
                 }
 
                 const data = await response.json();
-                return data.candidates?.[0]?.content?.parts?.[0]?.text || "I encountered a minor glitch in my processing. Could you ask that again?";
+                
+                if (data.error) return "❌ **AI Core Error**: " + data.error.message;
+
+                const aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm having trouble generating a response.";
+                
+                // Save to local history
+                chatHistory.push({ role: "user", parts: [{ text: userText }] });
+                chatHistory.push({ role: "model", parts: [{ text: aiResponseText }] });
+
+                // Keep history manageable (last 20 messages)
+                if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+
+                return aiResponseText;
+
             } catch (error) {
-                return "System link offline. Please check your network connection.";
+                return "📡 **Transmission Failed**: Please check your connection.";
             }
         }
 
