@@ -135,7 +135,7 @@
                         <i data-lucide="bot" class="w-6 h-6"></i>
                     </div>
                     <div class="p-5 rounded-2xl rounded-tl-none message-bubble-bot text-slate-200">
-                        <p class="text-sm md:text-base leading-relaxed">Hi! I'm <b>Bikom Axel</b>, your upgraded AI tutor. I'm now powered by the ultra-stable Gemini 1.5 core. What shall we learn today?</p>
+                        <p class="text-sm md:text-base leading-relaxed">Hi! I'm <b>Bikom Axel</b>, your upgraded AI tutor. I'm now using a more compatible connection method. What shall we learn today?</p>
                     </div>
                 </div>
             </div>
@@ -161,7 +161,7 @@
                     </button>
                 </div>
                 <p class="text-[10px] text-center text-slate-600 mt-4 font-medium tracking-wide">
-                    BIKOM AXEL INTELLECTUAL INTERFACE • CORE V2.1 (STABILIZED)
+                    BIKOM AXEL INTELLECTUAL INTERFACE • CORE V2.2 (STABILIZED)
                 </p>
             </div>
         </div>
@@ -173,9 +173,6 @@
          * Ensure you have pasted your key between the quotes below.
          */
         const API_KEY = "AIzaSyBBZvwXBSNMubKV6itHRTBUiAgv0X0Jbn0"; 
-        
-        // Fixed: Use gemini-1.5-flash-latest to ensure resolution in v1beta API
-        const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
 
         const MODES = {
             SOCRATIC: "Your name is Bikom Axel. You are a world-class Socratic tutor. Your goal is to help the student reach the answer through logic. NEVER give answers directly. Instead, break down complex thoughts into tiny, manageable questions. If a student is stuck, give a hint using an analogy. Be warm, professional, and intellectually stimulating.",
@@ -235,8 +232,16 @@
 
         async function fetchAIResponse(userText, retries = 0) {
             if (!API_KEY || API_KEY.trim() === "") {
-                return "⚠️ **Bikom Axel Offline**: An API key is required in the code (line 133). Please check your GitHub source file.";
+                return "⚠️ **Bikom Axel Offline**: An API key is required in the code (line 133).";
             }
+
+            // We try different URL patterns that are common for the API
+            const urlPatterns = [
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`,
+                `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${API_KEY}`
+            ];
+
+            const currentUrl = urlPatterns[retries % urlPatterns.length];
 
             const contents = [
                 ...chatHistory,
@@ -244,7 +249,7 @@
             ];
 
             try {
-                const response = await fetch(`${API_URL}?key=${API_KEY}`, {
+                const response = await fetch(currentUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -259,30 +264,37 @@
                     })
                 });
 
-                if (response.status === 429 && retries < 5) {
-                    const delay = Math.pow(2, retries) * 1000;
-                    await new Promise(r => setTimeout(r, delay));
-                    return fetchAIResponse(userText, retries + 1);
-                }
-
                 if (!response.ok) {
                     const errorData = await response.json();
+                    
+                    // If model not found or bad request, try the next URL pattern
+                    if ((response.status === 404 || response.status === 400) && retries < urlPatterns.length - 1) {
+                        return fetchAIResponse(userText, retries + 1);
+                    }
+
+                    if (response.status === 429 && retries < 5) {
+                        const delay = Math.pow(2, retries) * 1000;
+                        await new Promise(r => setTimeout(r, delay));
+                        return fetchAIResponse(userText, retries + 1);
+                    }
+
                     return `❌ **Connection Error (${response.status})**: ${errorData.error?.message || 'The AI service is currently unavailable.'}`;
                 }
 
                 const data = await response.json();
-                
-                const aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I processed your request but couldn't formulate a response. Please try rephrasing.";
+                const aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I processed your request but couldn't formulate a response.";
                 
                 chatHistory.push({ role: "user", parts: [{ text: userText }] });
                 chatHistory.push({ role: "model", parts: [{ text: aiResponseText }] });
 
                 if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
-
                 return aiResponseText;
 
             } catch (error) {
-                return "📡 **Signal Lost**: I couldn't reach the thinking core. Please check your internet connection or verify the API key is active.";
+                if (retries < urlPatterns.length - 1) {
+                    return fetchAIResponse(userText, retries + 1);
+                }
+                return "📡 **Signal Lost**: I couldn't reach the thinking core. Please check your internet connection.";
             }
         }
 
