@@ -174,8 +174,8 @@
          */
         const API_KEY = "AIzaSyBBZvwXBSNMubKV6itHRTBUiAgv0X0Jbn0"; 
         
-        // Switched to Gemini 1.5 Flash for maximum reliability and stability across all regions
-        const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+        // Fixed: Use gemini-1.5-flash-latest to ensure resolution in v1beta API
+        const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
 
         const MODES = {
             SOCRATIC: "Your name is Bikom Axel. You are a world-class Socratic tutor. Your goal is to help the student reach the answer through logic. NEVER give answers directly. Instead, break down complex thoughts into tiny, manageable questions. If a student is stuck, give a hint using an analogy. Be warm, professional, and intellectually stimulating.",
